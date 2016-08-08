@@ -3,6 +3,117 @@
 
 # See README.md for details
 
+BASIC_SETUP = <<SCRIPT
+  echo "###############################"
+  echo "# INSTALLING GIT, NANO, & NTP #"
+  echo "###############################"
+  sudo yum -y install nano git ntp
+  sudo service ntpd start
+  sudo chkconfig ntpd on
+SCRIPT
+
+PUPPET_SETUP = <<SCRIPT
+  echo "###############################"
+  echo "##### INSTALLING PUPPET #######"
+  echo "###############################"
+  sudo yum -y install http://yum.puppetlabs.com/puppetlabs-release-el-6.noarch.rpm
+  sudo yum -y install puppet-server
+  puppet master --version
+SCRIPT
+
+PUPPET_CONFIG = <<SCRIPT
+  echo "###############################"
+  echo "#### CONFIGURING PUPPET #######"
+  echo "###############################"
+  echo "creating environment directories"
+  sudo mkdir -p /etc/puppet/environments/production/{modules,manifests}
+  printf 'modulepath = /etc/puppet/environments/production/modules\n' > ~/environment.conf
+  printf 'environment_timeout = 5s\n' >> ~/environment.conf
+  cd /etc/puppet/environments/production/
+  sudo mv ~/environment.conf ./
+  cat environment.conf
+SCRIPT
+
+## Changes needed to make to puppet.conf
+# [main]
+#     # DNS alternative names
+#     dns_alt_names = puppet,puppetmaster,puppetmaster.benpiper.com,puppetmaster.lightstream.com
+# [master]
+#     environmentpath = $confdir/environments
+#     basemodulepath = $confdir/modules:/opt/puppet/share/modules
+
+SECURITY_CONFIG = <<SCRIPT
+  echo "###############################"
+  echo "#### CONFIGURING SECURITY #####"
+  echo "###############################"
+  echo "setting SELinux to permissive mode"
+  sudo setenforce permissive
+  sudo sed -i 's\\=enforcing\\=permissive\\g' /etc/sysconfig/selinux
+  sudo getenforce
+  sudo cat /etc/sysconfig/selinux
+SCRIPT
+
+## Create puppet SSL scripts
+# sudo puppet master --verbose --no-daemonize
+# sudo ls -la /var/lib/puppet/ssl
+
+## Modify IP-Tables file [/etc/sysconfig/iptables]
+# -A INPUT -m state --state NEW -m tcp -p --dport 8140 -j ACCEPT
+
+## restart service
+# sudo service iptables restart
+
+APACHE_SETUP = <<SCRIPT
+  echo "################################"
+  echo "######## INSTALL APACHE ########"
+  echo "################################"
+  sudo yum -y install httpd httpd-devel mod_ssl ruby-devel rubygems gcc gcc-c++ libcurl-devel openssl-devel
+SCRIPT
+
+PASSENGER_SETUP = <<SCRIPT
+  echo "################################"
+  echo "####### INSTALL PASSENGER ######"
+  echo "################################"
+  sudo gem install rake --version 10.4.2
+  sudo gem install rack --version 1.6.0
+  sudo gem install passenger --version 4.0.56
+  sudo gem install daemon_controller --version 1.2.0
+SCRIPT
+
+## run passenger apache module
+# sudo passenger-install-apache2-module
+
+## copy Load Module text from module installation to notepad for later use
+
+PUPPET_RACK_SETUP = <<SCRIPT
+   echo "################################"
+   echo "####### PUPPET RACK SETUP ######"
+   echo "################################"
+   sudo mkdir -p /usr/share/puppet/rack/puppetmasterd/{public/tmp}
+   sudo cp /usr/share/puppet/ext/rack/config.ru /usr/share/puppet/rack/puppetmasterd/
+   sudo chown puppet:puppet /usr/share/puppet/rack/puppetmasterd/config.ru
+   ls -la /usr/share/puppet/rack/puppetmasterd/config.ru
+SCRIPT
+
+PASSENGER_CONFIG_ALT = <<SCRIPT
+  echo "################################"
+  echo "####### PASSENGER CONFIG #######"
+  echo "################################"
+  cd ~
+  git clone https://github.com/benpiper/puppet-fundamentals-puppetmaster
+  ls -l
+  cd puppet-fundamentals-puppetmaster
+SCRIPT
+
+## modify conf file from git repo so that passenger version matches what was saved earlier
+## version in repo is 5.0.* - installed version is 4.0.56
+## copy new file to apache
+# sudo cp puppetmaster.conf /etc/httpd/conf.d/puppetmaster.conf
+## start apache service
+# sudo service httpd start
+## Ensure Apache starts when server starts
+# sudo chkconfig httpd on
+
 VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
@@ -10,11 +121,19 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = "centos65-base"
 
   config.vm.define "puppetmaster" do |puppetmaster|
-  
+
     puppetmaster.vm.hostname = "puppetmaster"
-  
+
     puppetmaster.vm.network "private_network", ip: "172.31.0.201"
-  
+
   end
-  
+
+  config.vm.provision :shell, inline: BASIC_SETUP, privileged: false
+  config.vm.provision :shell, inline: PUPPET_SETUP, privileged: false
+  config.vm.provision :shell, inline: PUPPET_CONFIG, privileged: false
+  config.vm.provision :shell, inline: SECURITY_CONFIG, privileged: false
+  config.vm.provision :shell, inline: APACHE_SETUP, privileged: false
+  config.vm.provision :shell, inline: PASSENGER_SETUP, privileged: false
+  config.vm.provision :shell, inline: PUPPET_RACK_SETUP, privileged: false
+  config.vm.provision :shell, inline: PASSENGER_CONFIG_ALT, privileged: false
 end
