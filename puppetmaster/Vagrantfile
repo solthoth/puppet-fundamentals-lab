@@ -35,6 +35,7 @@ PUPPET_CONFIG = <<SCRIPT
 SCRIPT
 
 ## Changes needed to make to puppet.conf
+## /etc/puppet/puppet.conf
 # [main]
 #     # DNS alternative names
 #     dns_alt_names = puppet,puppetmaster,puppetmaster.benpiper.com,puppetmaster.lightstream.com

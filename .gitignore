@@ -1,1 +1,8 @@
+
+### Vagrant ###
+.vagrant/
 *.vagrant
+
+### ISO / BOX ###
+*.box
+*.iso
